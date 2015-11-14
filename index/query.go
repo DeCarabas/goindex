@@ -199,8 +199,8 @@ func (index *PostIndex) ParseQuery(query string) (*QueryNode, error) {
 				return nil, ParseError{start - 1, "Unterminated string constant"}
 			}
 
-			set := index.findOrCreateSets([]string{query[start:i]})[0]
-			stack.Push(&TerminalOperator{Current: set.FirstChunk()})
+			chunk := index.findSetChunkForQuery(query[start:i])
+			stack.Push(&TerminalOperator{Current: chunk})
 		} else {
 			return nil, ParseError{i, "Unexpected character"}
 		}
