@@ -86,6 +86,7 @@ func TestFoo(b *testing.T) {
 }
 
 func BenchmarkAddPost(b *testing.B) {
+	rand.Seed(time.Now().UnixNano()) // Seed the random number generator.
 	idx := &PostIndex{}
 	posts, err := createPosts(b.N)
 	if err != nil {
