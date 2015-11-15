@@ -175,7 +175,7 @@ func (s *opStack) Pop() QueryOperator {
 	return result
 }
 
-func (index *PostIndex) ParseQuery(query string) (*QueryNode, error) {
+func ParseQuery(index *PostIndex, query string) (*QueryNode, error) {
 	stack := &opStack{}
 	for i := 0; i < len(query); i++ {
 		if query[i] == '&' {

@@ -184,3 +184,24 @@ func (index *PostIndex) AddPost(id uint64, words []string) {
 		v.SyncRoot.Unlock()
 	}
 }
+
+func (index *PostIndex) QueryPosts(query string, resultCount int) ([]uint64, error) {
+	qn,err := ParseQuery(index, query)
+	if err != nil {
+		return nil, err
+	}
+
+	localIds := make([]uint32, 0, resultCount)
+	for i := 0; i < resultCount && qn.MoveNext(); i++ {
+		localIds = append(localIds, qn.Current())
+	}
+
+	results := make([]uint64, len(localIds))
+	index.idMapLock.RLock()
+	defer index.idMapLock.RUnlock()
+	for i := 0; i < len(localIds); i++ {
+		results[i] = index.idMap[localIds[i]]
+	}
+
+	return results, nil
+}

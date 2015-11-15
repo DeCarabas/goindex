@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -17,21 +18,6 @@ import (
 type testPost struct {
 	id    uint64
 	words []string
-}
-
-func buildChain() (*Chain, error) {
-	t, err := ioutil.ReadFile("wonderland.txt")
-	if err != nil {
-		return nil, err
-	}
-
-	c := NewChain(2)
-	pars := strings.Split((string)(t), "\r\n\r\n")
-	for i := 0; i < len(pars); i++ {
-		c.Build(strings.NewReader(pars[i]))
-	}
-
-	return c, nil
 }
 
 func splitToWords(postText string) []string {
@@ -53,8 +39,34 @@ func splitToWords(postText string) []string {
 	return words
 }
 
+func loadAllWords() ([]string, error) {
+	t, err := ioutil.ReadFile("wonderland.txt")
+	if err != nil {
+		return nil, err
+	}
+
+	words := splitToWords((string)(t))
+	sort.Strings(words)
+	removeDuplicateWords(&words)
+	return words,nil
+}
+
+func buildChain() (*Chain, error) {
+	t, err := ioutil.ReadFile("wonderland.txt")
+	if err != nil {
+		return nil, err
+	}
+
+	c := NewChain(2)
+	pars := strings.Split((string)(t), "\r\n\r\n")
+	for i := 0; i < len(pars); i++ {
+		c.Build(strings.NewReader(pars[i]))
+	}
+
+	return c, nil
+}
+
 func createPosts(count int) ([]testPost, error) {
-	// Make a change a la ga.
 	c, err := buildChain()
 	if err != nil {
 		return nil, err
@@ -63,26 +75,24 @@ func createPosts(count int) ([]testPost, error) {
 	posts := make([]testPost, count)
 	for i := 0; i < count; i++ {
 		text := c.Generate(20)
-		posts[i] = testPost{id: 0, words: splitToWords(text)}
+		posts[i] = testPost{id: (uint64)(rand.Int63()), words: splitToWords(text)}
 	}
 
 	return posts, nil
 }
 
-func TestFoo(b *testing.T) {
-	rand.Seed(time.Now().UnixNano()) // Seed the random number generator.
-	c, err := buildChain()
-	if err != nil {
-		b.Error("Error building chain")
-		return
-	}
-	text := c.Generate(20)
-	b.Log(text)
+func TestBasicAddRemove(b *testing.T) {
+	text := "The Hatter shook his head contemptuously. 'I dare say you never to lose YOUR temper!' 'Hold your tongue!' said the"
 	w := splitToWords(text)
-	b.Log(strings.Join(w, " "))
+	id := (uint64)(rand.Int63())
 
 	idx := &PostIndex{}
-	idx.AddPost(0, w)
+	idx.AddPost(id, w)
+
+	// Test ORs.
+	r,err := idx.QueryPosts("\"hatter\"", 100)
+
+
 }
 
 func BenchmarkAddPost(b *testing.B) {
