@@ -10,17 +10,17 @@ import (
 	"time"
 	"unicode"
 
-	"testing"
 	"sync/atomic"
+	"testing"
 )
 
 type testPost struct {
-	id uint64
+	id    uint64
 	words []string
 }
 
-func buildChain() (*Chain,error) {
-	t,err := ioutil.ReadFile("wonderland.txt")
+func buildChain() (*Chain, error) {
+	t, err := ioutil.ReadFile("wonderland.txt")
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func buildChain() (*Chain,error) {
 		c.Build(strings.NewReader(pars[i]))
 	}
 
-	return c,nil
+	return c, nil
 }
 
 func splitToWords(postText string) []string {
@@ -53,9 +53,9 @@ func splitToWords(postText string) []string {
 	return words
 }
 
-func createPosts(count int) ([]testPost,error) {
+func createPosts(count int) ([]testPost, error) {
 	// Make a change a la ga.
-	c,err := buildChain()
+	c, err := buildChain()
 	if err != nil {
 		return nil, err
 	}
@@ -63,15 +63,15 @@ func createPosts(count int) ([]testPost,error) {
 	posts := make([]testPost, count)
 	for i := 0; i < count; i++ {
 		text := c.Generate(20)
-		posts[i] = testPost{id:0,words:splitToWords(text)}
+		posts[i] = testPost{id: 0, words: splitToWords(text)}
 	}
 
-	return posts,nil
+	return posts, nil
 }
 
 func TestFoo(b *testing.T) {
 	rand.Seed(time.Now().UnixNano()) // Seed the random number generator.
-	c,err := buildChain()
+	c, err := buildChain()
 	if err != nil {
 		b.Error("Error building chain")
 		return
@@ -87,7 +87,7 @@ func TestFoo(b *testing.T) {
 
 func BenchmarkAddPost(b *testing.B) {
 	idx := &PostIndex{}
-	posts,err := createPosts(b.N)
+	posts, err := createPosts(b.N)
 	if err != nil {
 		b.Error("Error creating posts")
 		return
@@ -103,7 +103,6 @@ func BenchmarkAddPost(b *testing.B) {
 		}
 	})
 }
-
 
 // Markov stuff, taken from https://golang.org/doc/codewalk/markov/
 
