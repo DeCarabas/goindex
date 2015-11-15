@@ -26,6 +26,9 @@ func NewPostSet() *PostSet {
 }
 
 func (set *PostSet) AddPost(id uint32) {
+	// Note that a lock is held here even though the code below is
+	// thread-safe, to maintain ID orders. See below.
+	//
 	firstChunk := set.FirstChunk()
 	if firstChunk.Length == ChunkSize {
 		target := &PostChunk{[ChunkSize]uint32{0: id}, 1, firstChunk}
@@ -128,6 +131,18 @@ func (index *PostIndex) addIdMapping(globalId uint64, localId uint32) {
 	index.idMap[localId] = globalId
 }
 
+func removeDuplicateWords(words *[]string) {
+	old := *words
+	back := 0
+	for i := 1; i < len(old); i++ {
+		if old[i] != old[back] {
+			back++
+			old[back] = old[i]
+		}
+	}
+	*words = old[:back+1]
+}
+
 func (index *PostIndex) AddPost(id uint64, words []string) {
 	// The order of operations here is pretty critical. We need to ensure is
 	// that each of the sets contains integers in ascending order. IDs must
@@ -151,11 +166,11 @@ func (index *PostIndex) AddPost(id uint64, words []string) {
 	sortedWords := make([]string, len(words), cap(words))
 	copy(sortedWords, words)
 	sort.Strings(sortedWords)
+	removeDuplicateWords(&sortedWords)
 
 	sets := index.findOrCreateSets(sortedWords)
 	for _, v := range sets {
 		v.SyncRoot.Lock()
-		defer v.SyncRoot.Unlock()
 	}
 
 	localId := (uint32)(atomic.AddInt32(&index.nextLocalId, 1))
@@ -163,5 +178,9 @@ func (index *PostIndex) AddPost(id uint64, words []string) {
 
 	for _, v := range sets {
 		v.AddPost(localId)
+	}
+
+	for _, v := range sets {
+		v.SyncRoot.Unlock()
 	}
 }
