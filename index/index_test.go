@@ -84,8 +84,9 @@ func randomQuery(words []string, rand *rand.Rand) string {
 		return fmt.Sprintf("\"%s\"", strings.ToLower(words[0]))
 	} else {
 		wl := len(words)
-		left := randomQuery(words[:wl/2], rand)
-		right := randomQuery(words[wl/2:], rand)
+		mid := wl / 2
+		left := randomQuery(words[0:mid], rand)
+		right := randomQuery(words[mid:wl], rand)
 
 		if rand.Int()&1 != 0 {
 			return left + right + "&"
@@ -146,7 +147,36 @@ func BenchmarkAddPost(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			i := atomic.AddInt32(&index, 1)
-			idx.AddPost(posts[i].id, posts[i].words)
+			p := posts[i]
+			idx.AddPost(p.id, p.words)
+		}
+	})
+}
+
+func BenchmarkQueryPost(b *testing.B) {
+	// Pre-build posts and queries so we're not measuring that.
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	idx := &PostIndex{}
+	posts := createPosts(aliceChain, 100000, rand) // Large number of posts to query
+	for _, v := range posts {
+		idx.AddPost(v.id, v.words)
+	}
+
+	queries := make([]string, b.N)
+	for i := 0; i < len(queries); i++ {
+		ql := rand.Intn(4) + 1
+		t := aliceChain.Generate(ql, rand)
+		w := splitToWords(t)
+		queries[i] = randomQuery(w, rand)
+	}
+	var index int32 = -1 // Count up to N but atomically
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			i := atomic.AddInt32(&index, 1)
+			q := queries[i]
+			idx.QueryPosts(q, 100)
 		}
 	})
 }
