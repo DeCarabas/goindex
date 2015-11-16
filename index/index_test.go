@@ -69,10 +69,10 @@ func buildChain() (*Chain, error) {
 	return c, nil
 }
 
-func createPosts(chain *Chain, count int) []testPost {
+func createPosts(chain *Chain, count int, rand *rand.Rand) []testPost {
 	posts := make([]testPost, count)
 	for i := 0; i < count; i++ {
-		text := chain.Generate(20)
+		text := chain.Generate(20, rand)
 		posts[i] = testPost{id: (uint64)(rand.Int63()), words: splitToWords(text)}
 	}
 
@@ -104,7 +104,7 @@ type AlicePost struct {
 }
 
 func (p AlicePost) Generate(rand *rand.Rand, size int) reflect.Value {
-	t := aliceChain.Generate(size)
+	t := aliceChain.Generate(size, rand)
 	w := splitToWords(t)
 	q := randomQuery(w, rand)
 	return reflect.ValueOf(AlicePost{t, w, q})
@@ -136,9 +136,9 @@ func TestAddAndBasicQuery(t *testing.T) {
 }
 
 func BenchmarkAddPost(b *testing.B) {
-	rand.Seed(time.Now().UnixNano()) // Seed the random number generator.
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	idx := &PostIndex{}
-	posts := createPosts(aliceChain, b.N)
+	posts := createPosts(aliceChain, b.N, rand)
 
 	var index int32 = -1 // Count up to N but atomically
 
@@ -238,7 +238,7 @@ func (c *Chain) Build(r io.Reader) {
 }
 
 // Generate returns a string of at most n words generated from Chain.
-func (c *Chain) Generate(n int) string {
+func (c *Chain) Generate(n int, rand *rand.Rand) string {
 	p := make(Prefix, c.prefixLen)
 	var words []string
 	for i := 0; i < n; i++ {
