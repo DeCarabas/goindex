@@ -79,13 +79,35 @@ func createPosts(chain *Chain, count int) []testPost {
 	return posts
 }
 
+func randomQuery(words []string, rand *rand.Rand) string {
+	if len(words) == 1 {
+		return fmt.Sprintf("\"%s\"", strings.ToLower(words[0]))
+	} else {
+		wl := len(words)
+		left := randomQuery(words[:wl/2], rand)
+		right := randomQuery(words[wl/2:], rand)
+
+		if rand.Int()&1 != 0 {
+			return left + right + "&"
+		} else {
+			return left + right + "|"
+		}
+	}
+}
+
 var aliceChain *Chain
 
-type AliceText string
+type AlicePost struct {
+	Text  string
+	Words []string
+	Query string
+}
 
-func (a AliceText) Generate(rand *rand.Rand, size int) reflect.Value {
-	at := (AliceText)(aliceChain.Generate(size))
-	return reflect.ValueOf(at)
+func (p AlicePost) Generate(rand *rand.Rand, size int) reflect.Value {
+	t := aliceChain.Generate(size)
+	w := splitToWords(t)
+	q := randomQuery(w, rand)
+	return reflect.ValueOf(AlicePost{t, w, q})
 }
 
 func TestMain(m *testing.M) {
@@ -99,15 +121,13 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestAddAndQuery(t *testing.T) {
-	f := func(text AliceText, id uint64) bool {
-		w := splitToWords((string)(text))
-
+func TestAddAndBasicQuery(t *testing.T) {
+	f := func(post AlicePost, id uint64) bool {
+		t.Logf("Testing %s (%v) with query %s", post.Text, post.Words, post.Query)
 		idx := &PostIndex{}
-		idx.AddPost(id, w)
+		idx.AddPost(id, post.Words)
 
-		q := fmt.Sprintf("\"%s\"", strings.ToLower(w[0]))
-		r, err := idx.QueryPosts(q, 100)
+		r, err := idx.QueryPosts(post.Query, 100)
 		return err == nil && len(r) == 1 && r[0] == id
 	}
 	if err := quick.Check(f, nil); err != nil {

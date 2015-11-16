@@ -1,6 +1,6 @@
 package index
 
-const beforeStartedLength int = 0
+const beforeStartedLength int = -2
 const doneLength = -1
 const queryBufferSize int = 128
 
@@ -15,12 +15,16 @@ type QueryNode struct {
 	op     QueryOperator
 }
 
+func NewQueryNode(op QueryOperator) QueryNode {
+	return QueryNode{length: beforeStartedLength, cursor: 0, op: op}
+}
+
 func (q *QueryNode) Current() uint32 {
 	return q.buffer[q.cursor]
 }
 
 func (q *QueryNode) Started() bool {
-	return q.length == beforeStartedLength
+	return q.length != beforeStartedLength
 }
 
 func (q *QueryNode) Done() bool {
@@ -70,7 +74,7 @@ type AndOperator struct {
 }
 
 func NewAndOperator(left QueryOperator, right QueryOperator) *AndOperator {
-	return &AndOperator{QueryNode{op: left}, QueryNode{op: right}}
+	return &AndOperator{NewQueryNode(left), NewQueryNode(right)}
 }
 
 func (op *AndOperator) nextMatch() (uint32, bool) {
@@ -114,7 +118,7 @@ type OrOperator struct {
 }
 
 func NewOrOperator(left QueryOperator, right QueryOperator) *OrOperator {
-	return &OrOperator{QueryNode{op: left}, QueryNode{op: right}}
+	return &OrOperator{NewQueryNode(left), NewQueryNode(right)}
 }
 
 func (op *OrOperator) NextChunk(buffer *[queryBufferSize]uint32) int {
@@ -150,6 +154,7 @@ func (op *OrOperator) NextChunk(buffer *[queryBufferSize]uint32) int {
 		op.Right.MoveNext()
 		i++
 	}
+
 	return i
 }
 
@@ -211,5 +216,6 @@ func ParseQuery(index *PostIndex, query string) (*QueryNode, error) {
 	if stack.Length() != 1 {
 		return nil, ParseError{len(query), "Unterminated query"}
 	}
-	return &QueryNode{op: stack.Pop()}, nil
+	r := NewQueryNode(stack.Pop())
+	return &r, nil
 }
