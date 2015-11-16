@@ -5,7 +5,7 @@ const doneLength = -1
 const queryBufferSize int = 128
 
 type QueryOperator interface {
-	NextChunk(buffer [queryBufferSize]uint32) int
+	NextChunk(buffer *[queryBufferSize]uint32) int
 }
 
 type QueryNode struct {
@@ -31,7 +31,7 @@ func (q *QueryNode) MoveNext() bool {
 	if !q.Done() {
 		q.cursor++
 		if q.cursor >= q.length {
-			q.length = q.op.NextChunk(q.buffer)
+			q.length = q.op.NextChunk(&q.buffer)
 			if q.length == 0 { // NextChunk returns 0 to signal completion.
 				q.length = doneLength
 			}
@@ -47,11 +47,14 @@ type TerminalOperator struct {
 	ChunkCursor int32
 }
 
-func (op *TerminalOperator) NextChunk(buffer [queryBufferSize]uint32) int {
+func (op *TerminalOperator) NextChunk(buffer *[queryBufferSize]uint32) int {
 	var i int = 0
 	for i < queryBufferSize && op.Current != nil {
 		if op.ChunkCursor < 0 {
 			op.Current = op.Current.Next
+			if op.Current == nil {
+				break
+			}
 			op.ChunkCursor = op.Current.Length - 1
 		}
 		buffer[i] = op.Current.IDs[op.ChunkCursor]
@@ -92,7 +95,7 @@ func (op *AndOperator) nextMatch() (uint32, bool) {
 	return op.Left.Current(), true
 }
 
-func (op *AndOperator) NextChunk(buffer [queryBufferSize]uint32) int {
+func (op *AndOperator) NextChunk(buffer *[queryBufferSize]uint32) int {
 	i := 0
 	for i < queryBufferSize {
 		if value, success := op.nextMatch(); success {
@@ -114,7 +117,7 @@ func NewOrOperator(left QueryOperator, right QueryOperator) *OrOperator {
 	return &OrOperator{QueryNode{op: left}, QueryNode{op: right}}
 }
 
-func (op *OrOperator) NextChunk(buffer [queryBufferSize]uint32) int {
+func (op *OrOperator) NextChunk(buffer *[queryBufferSize]uint32) int {
 	if !op.Left.Started() {
 		op.Left.MoveNext()
 		op.Right.MoveNext()

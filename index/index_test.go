@@ -48,7 +48,7 @@ func loadAllWords() ([]string, error) {
 	words := splitToWords((string)(t))
 	sort.Strings(words)
 	removeDuplicateWords(&words)
-	return words,nil
+	return words, nil
 }
 
 func buildChain() (*Chain, error) {
@@ -90,9 +90,19 @@ func TestBasicAddRemove(b *testing.T) {
 	idx.AddPost(id, w)
 
 	// Test ORs.
-	r,err := idx.QueryPosts("\"hatter\"", 100)
-
-
+	r, err := idx.QueryPosts("\"hatter\"", 100)
+	if err != nil {
+		b.Errorf("Error querying posts: %s", err.Error())
+		return
+	}
+	if len(r) != 1 {
+		b.Errorf("Expected exactly one item, got %d", len(r))
+		return
+	}
+	if r[0] != id {
+		b.Errorf("Didn't get my ID back, expected %d got %d", id, r[0])
+		return
+	}
 }
 
 func BenchmarkAddPost(b *testing.B) {

@@ -131,6 +131,21 @@ func (index *PostIndex) addIdMapping(globalId uint64, localId uint32) {
 	index.idMap[localId] = globalId
 }
 
+func (index *PostIndex) mapLocalIds(locals []uint32) []uint64 {
+	results := make([]uint64, len(locals))
+
+	index.idMapLock.RLock()
+	defer index.idMapLock.RUnlock()
+	for i, v := range locals {
+		g, ok := index.idMap[v]
+		if !ok {
+			panic("Could not find local ID in map")
+		}
+		results[i] = g
+	}
+	return results
+}
+
 func removeDuplicateWords(words *[]string) {
 	old := *words
 	back := 0
@@ -186,7 +201,7 @@ func (index *PostIndex) AddPost(id uint64, words []string) {
 }
 
 func (index *PostIndex) QueryPosts(query string, resultCount int) ([]uint64, error) {
-	qn,err := ParseQuery(index, query)
+	qn, err := ParseQuery(index, query)
 	if err != nil {
 		return nil, err
 	}
@@ -196,12 +211,6 @@ func (index *PostIndex) QueryPosts(query string, resultCount int) ([]uint64, err
 		localIds = append(localIds, qn.Current())
 	}
 
-	results := make([]uint64, len(localIds))
-	index.idMapLock.RLock()
-	defer index.idMapLock.RUnlock()
-	for i := 0; i < len(localIds); i++ {
-		results[i] = index.idMap[localIds[i]]
-	}
-
+	results := index.mapLocalIds(localIds)
 	return results, nil
 }
