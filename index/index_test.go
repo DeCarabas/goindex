@@ -2,17 +2,20 @@ package index
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"os"
+	"reflect"
 	"sort"
 	"strings"
-	"time"
-	"unicode"
-
 	"sync/atomic"
 	"testing"
+	"testing/quick"
+	"time"
+	"unicode"
 )
 
 type testPost struct {
@@ -66,53 +69,56 @@ func buildChain() (*Chain, error) {
 	return c, nil
 }
 
-func createPosts(count int) ([]testPost, error) {
-	c, err := buildChain()
-	if err != nil {
-		return nil, err
-	}
-
+func createPosts(chain *Chain, count int) []testPost {
 	posts := make([]testPost, count)
 	for i := 0; i < count; i++ {
-		text := c.Generate(20)
+		text := chain.Generate(20)
 		posts[i] = testPost{id: (uint64)(rand.Int63()), words: splitToWords(text)}
 	}
 
-	return posts, nil
+	return posts
 }
 
-func TestBasicAddRemove(b *testing.T) {
-	text := "The Hatter shook his head contemptuously. 'I dare say you never to lose YOUR temper!' 'Hold your tongue!' said the"
-	w := splitToWords(text)
-	id := (uint64)(rand.Int63())
+var aliceChain *Chain
 
-	idx := &PostIndex{}
-	idx.AddPost(id, w)
+type AliceText string
 
-	// Test ORs.
-	r, err := idx.QueryPosts("\"hatter\"", 100)
-	if err != nil {
-		b.Errorf("Error querying posts: %s", err.Error())
-		return
+func (a AliceText) Generate(rand *rand.Rand, size int) reflect.Value {
+	at := (AliceText)(aliceChain.Generate(size))
+	return reflect.ValueOf(at)
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	var err error
+	if aliceChain, err = buildChain(); err != nil {
+		fmt.Printf("Unable to build chain for testing: %s", err.Error())
+		os.Exit(-1)
 	}
-	if len(r) != 1 {
-		b.Errorf("Expected exactly one item, got %d", len(r))
-		return
+
+	os.Exit(m.Run())
+}
+
+func TestAddAndQuery(t *testing.T) {
+	f := func(text AliceText, id uint64) bool {
+		w := splitToWords((string)(text))
+
+		idx := &PostIndex{}
+		idx.AddPost(id, w)
+
+		q := fmt.Sprintf("\"%s\"", strings.ToLower(w[0]))
+		r, err := idx.QueryPosts(q, 100)
+		return err == nil && len(r) == 1 && r[0] == id
 	}
-	if r[0] != id {
-		b.Errorf("Didn't get my ID back, expected %d got %d", id, r[0])
-		return
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
 	}
 }
 
 func BenchmarkAddPost(b *testing.B) {
 	rand.Seed(time.Now().UnixNano()) // Seed the random number generator.
 	idx := &PostIndex{}
-	posts, err := createPosts(b.N)
-	if err != nil {
-		b.Error("Error creating posts")
-		return
-	}
+	posts := createPosts(aliceChain, b.N)
 
 	var index int32 = -1 // Count up to N but atomically
 
