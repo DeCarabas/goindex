@@ -181,6 +181,40 @@ func BenchmarkQueryPost(b *testing.B) {
 	})
 }
 
+func BenchmarkAddAndQueryPost(b *testing.B) {
+	// Pre-build posts and queries so we're not measuring that.
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	idx := &PostIndex{}
+	posts := createPosts(aliceChain, 100000, rand) // Large number of posts to query
+	for _, v := range posts {
+		idx.AddPost(v.id, v.words)
+	}
+
+	posts = createPosts(aliceChain, b.N, rand) // New posts!
+	queries := make([]string, b.N)
+	for i := 0; i < len(queries); i++ {
+		ql := rand.Intn(4) + 1
+		t := aliceChain.Generate(ql, rand)
+		w := splitToWords(t)
+		queries[i] = randomQuery(w, rand)
+	}
+	var index int32 = -1 // Count up to N but atomically
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			i := atomic.AddInt32(&index, 1)
+			if rand.Intn(5) == 0 {
+				p := posts[i]
+				idx.AddPost(p.id, p.words)
+			} else {
+				q := queries[i]
+				idx.QueryPosts(q, 100)
+			}
+		}
+	})
+}
+
 // Markov stuff, taken from https://golang.org/doc/codewalk/markov/
 
 // Copyright 2011 The Go Authors.  All rights reserved.
